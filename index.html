@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>Genius Brain v1.2 - Movement</title>
+
+<style>
+body{
+    margin:0;
+    font-family:Arial;
+    background:#0b1020;
+    color:#fff;
+    text-align:center;
+}
+
+.screen{display:none;padding:20px;}
+.active{display:block;}
+
+button{
+    padding:10px 15px;
+    margin:6px;
+    border:none;
+    border-radius:12px;
+    background:#6366f1;
+    color:#fff;
+    cursor:pointer;
+}
+
+input{
+    padding:10px;
+    width:60%;
+    margin:10px;
+}
+
+/* Canvas */
+canvas{
+    background:linear-gradient(#38bdf8,#0369a1);
+    border:3px solid #fff;
+    margin-top:10px;
+}
+
+/* Quiz */
+.card{
+    background:#fff;
+    color:#000;
+    max-width:700px;
+    margin:auto;
+    padding:20px;
+    border-radius:15px;
+}
+
+.choice{
+    display:block;
+    margin:10px auto;
+    padding:10px;
+    width:80%;
+    background:#eee;
+    border-radius:10px;
+    cursor:pointer;
+}
+
+.correct{background:#22c55e;color:#fff;}
+.wrong{background:#ef4444;color:#fff;}
+
+.star{
+    font-size:20px;
+    color:gold;
+}
+</style>
+</head>
+
+<body>
+
+<!-- ================= LOGIN ================= -->
+<div id="login" class="screen active">
+    <h2>🎮 Genius Brain v1.2</h2>
+
+    <input id="name" placeholder="اسم الطالب">
+    <button onclick="start()">ابدأ</button>
+</div>
+
+<!-- ================= MENU ================= -->
+<div id="menu" class="screen">
+    <h2 id="welcome"></h2>
+
+    <p>🏝️ تحرك داخل الخريطة بالأسهم</p>
+
+    <canvas id="map" width="500" height="300"></canvas>
+
+    <div id="progress"></div>
+
+    <button onclick="openDash()">📊 Dashboard</button>
+</div>
+
+<!-- ================= GAME ================= -->
+<div id="game" class="screen">
+<div class="card">
+    <h3 id="q"></h3>
+    <div id="choices"></div>
+</div>
+</div>
+
+<!-- ================= DASHBOARD ================= -->
+<div id="dash" class="screen">
+    <h2>📊 Dashboard</h2>
+    <div id="report"></div>
+    <button onclick="menu()">رجوع</button>
+</div>
+
+<script>
+
+/* ================= CORE ================= */
+
+let user="";
+let score=0;
+let index=0;
+let island=0;
+let stars=0;
+
+/* ================= DATA ================= */
+
+let data=JSON.parse(localStorage.getItem("gb_v12")||"{}");
+
+/* ================= QUESTIONS ================= */
+
+const islands=[
+[
+{q:"1/4 + 1/4 = ؟",c:["2/4","1/2","1/4"],a:1},
+{q:"2/5 + 1/5 = ؟",c:["3/5","2/10","1/5"],a:0},
+{q:"3/6 = ؟",c:["1/2","3/6","2/3"],a:0}
+]
+];
+
+/* ================= MAP ================= */
+
+let canvas=document.getElementById("map");
+let ctx=canvas.getContext("2d");
+
+let zones=[
+{x:100,y:80,w:120,h:60,name:"جزيرة الكسور"},
+{x:320,y:180,w:120,h:60,name:"قريبًا"}
+];
+
+let player={x:50,y:150};
+
+let keys={};
+
+document.addEventListener("keydown",e=>keys[e.key]=true);
+document.addEventListener("keyup",e=>keys[e.key]=false);
+
+/* ================= DRAW ================= */
+
+function draw(){
+    ctx.clearRect(0,0,500,300);
+
+    // islands
+    zones.forEach(z=>{
+        ctx.fillStyle="#1e293b";
+        ctx.fillRect(z.x,z.y,z.w,z.h);
+
+        ctx.fillStyle="#fff";
+        ctx.fillText(z.name,z.x+10,z.y+30);
+    });
+
+    // player
+    ctx.fillStyle="yellow";
+    ctx.beginPath();
+    ctx.arc(player.x,player.y,10,0,Math.PI*2);
+    ctx.fill();
+
+    moveCheck();
+}
+
+/* ================= MOVEMENT ================= */
+
+function moveCheck(){
+
+    if(keys["ArrowLeft"]) player.x-=3;
+    if(keys["ArrowRight"]) player.x+=3;
+    if(keys["ArrowUp"]) player.y-=3;
+    if(keys["ArrowDown"]) player.y+=3;
+
+    zones.forEach((z,i)=>{
+        if(player.x>z.x && player.x<z.x+z.w &&
+           player.y>z.y && player.y<z.y+z.h){
+            openIsland(i);
+        }
+    });
+}
+
+/* ================= LOOP ================= */
+
+function loop(){
+    draw();
+    requestAnimationFrame(loop);
+}
+loop();
+
+/* ================= GAME ================= */
+
+function openIsland(i){
+    island=i;
+    index=0;
+    score=0;
+    showGame();
+}
+
+function showGame(){
+    show("game");
+    next();
+}
+
+function next(){
+    let q=islands[island][index];
+
+    document.getElementById("q").innerText=q.q;
+
+    let ch=document.getElementById("choices");
+    ch.innerHTML="";
+
+    q.c.forEach((c,i)=>{
+        let b=document.createElement("div");
+        b.className="choice";
+        b.innerText=c;
+
+        b.onclick=()=>{
+            if(i===q.a){
+                b.classList.add("correct");
+                score+=10;
+            }else{
+                b.classList.add("wrong");
+            }
+
+            setTimeout(()=>{
+                index++;
+                if(index<islands[island].length){
+                    next();
+                }else finish();
+            },400);
+        };
+
+        ch.appendChild(b);
+    });
+}
+
+function finish(){
+
+    stars = score>=25?3:score>=15?2:1;
+
+    save();
+
+    document.getElementById("progress").innerHTML=
+    "⭐".repeat(stars) + " النتيجة: " + score;
+
+    menu();
+}
+
+/* ================= UI ================= */
+
+function show(id){
+    document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
+    document.getElementById(id).classList.add("active");
+}
+
+function start(){
+    user=document.getElementById("name").value;
+    if(!user) return alert("اكتب الاسم");
+
+    document.getElementById("welcome").innerText="أهلاً "+user;
+    show("menu");
+}
+
+/* ================= SAVE ================= */
+
+function save(){
+    if(!data[user]) data[user]=[];
+
+    data[user].push({
+        score,
+        stars,
+        date:new Date().toLocaleString()
+    });
+
+    localStorage.setItem("gb_v12",JSON.stringify(data));
+}
+
+/* ================= DASHBOARD ================= */
+
+function openDash(){
+    show("dash");
+
+    let html="<table border='1' width='90%'><tr><th>الطالب</th><th>الدرجة</th><th>النجوم</th><th>التاريخ</th></tr>";
+
+    for(let u in data){
+        data[u].forEach(r=>{
+            html+=`
+            <tr>
+                <td>${u}</td>
+                <td>${r.score}</td>
+                <td>${"⭐".repeat(r.stars)}</td>
+                <td>${r.date}</td>
+            </tr>`;
+        });
+    }
+
+    html+="</table>";
+
+    document.getElementById("report").innerHTML=html;
+}
+
+/* ================= INIT ================= */
+
+loop();
+
+</script>
+
+</body>
+</html>
