@@ -2,51 +2,69 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<title>Genius Brain v1.2 - Movement</title>
+<title>🏝️ أرخبيل الرياضيات - النسخة الاحترافية</title>
 
 <style>
 body{
     margin:0;
-    font-family:Arial;
-    background:#0b1020;
+    font-family: Arial;
+    background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);
     color:#fff;
     text-align:center;
 }
 
-.screen{display:none;padding:20px;}
-.active{display:block;}
+/* الخريطة */
+.map{
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:center;
+    padding:20px;
+}
 
-button{
-    padding:10px 15px;
-    margin:6px;
-    border:none;
-    border-radius:12px;
-    background:#6366f1;
-    color:#fff;
+.island{
+    width:200px;
+    height:130px;
+    margin:15px;
+    border-radius:20px;
+    background:linear-gradient(135deg,#ff9800,#ff5722);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    transition:0.3s;
+    box-shadow:0 8px 20px rgba(0,0,0,0.4);
+}
+.island:hover{
+    transform:scale(1.1) rotate(1deg);
+}
+
+/* اختيار المستوى */
+.levels{
+    display:none;
+    margin-top:30px;
+}
+
+.level-btn{
+    background:#4CAF50;
+    margin:10px;
+    padding:12px 20px;
+    border-radius:10px;
     cursor:pointer;
 }
 
-input{
-    padding:10px;
-    width:60%;
-    margin:10px;
+/* اللعبة */
+.game{
+    display:none;
+    padding:20px;
 }
 
-/* Canvas */
-canvas{
-    background:linear-gradient(#38bdf8,#0369a1);
-    border:3px solid #fff;
-    margin-top:10px;
-}
-
-/* Quiz */
 .card{
     background:#fff;
     color:#000;
-    max-width:700px;
-    margin:auto;
     padding:20px;
     border-radius:15px;
+    max-width:650px;
+    margin:auto;
 }
 
 .choice{
@@ -54,264 +72,243 @@ canvas{
     margin:10px auto;
     padding:10px;
     width:80%;
-    background:#eee;
     border-radius:10px;
+    background:#eee;
     cursor:pointer;
 }
 
-.correct{background:#22c55e;color:#fff;}
-.wrong{background:#ef4444;color:#fff;}
+.choice:hover{background:#ddd;}
 
-.star{
+.correct{background:#4CAF50 !important; color:#fff;}
+.wrong{background:#f44336 !important; color:#fff;}
+
+.progress{
+    height:12px;
+    background:#ccc;
+    border-radius:10px;
+    margin:10px;
+}
+.bar{
+    height:100%;
+    width:0%;
+    background:#4CAF50;
+}
+
+.timer{
+    font-size:18px;
+    color:#ffeb3b;
+}
+
+.stars{
     font-size:20px;
-    color:gold;
 }
 </style>
 </head>
 
 <body>
 
-<!-- ================= LOGIN ================= -->
-<div id="login" class="screen active">
-    <h2>🎮 Genius Brain v1.2</h2>
+<h1>🏝️ أرخبيل الرياضيات</h1>
+<h3>جزيرة الكسور</h3>
 
-    <input id="name" placeholder="اسم الطالب">
-    <button onclick="start()">ابدأ</button>
+<div id="map" class="map"></div>
+
+<div id="levels" class="levels">
+    <h2 id="areaName"></h2>
+    <button class="level-btn" onclick="startGame('easy')">سهل</button>
+    <button class="level-btn" onclick="startGame('medium')">متوسط</button>
+    <button class="level-btn" onclick="startGame('hard')">صعب</button>
+    <br><br>
+    <button onclick="backMap()">رجوع</button>
 </div>
 
-<!-- ================= MENU ================= -->
-<div id="menu" class="screen">
-    <h2 id="welcome"></h2>
-
-    <p>🏝️ تحرك داخل الخريطة بالأسهم</p>
-
-    <canvas id="map" width="500" height="300"></canvas>
-
-    <div id="progress"></div>
-
-    <button onclick="openDash()">📊 Dashboard</button>
+<div id="game" class="game">
+    <div class="card">
+        <div class="timer">⏱️ <span id="time">15</span></div>
+        <div class="stars" id="stars"></div>
+        <div id="score"></div>
+        <div class="progress"><div id="bar" class="bar"></div></div>
+        <h2 id="q"></h2>
+        <div id="choices"></div>
+    </div>
 </div>
 
-<!-- ================= GAME ================= -->
-<div id="game" class="screen">
-<div class="card">
-    <h3 id="q"></h3>
-    <div id="choices"></div>
-</div>
-</div>
-
-<!-- ================= DASHBOARD ================= -->
-<div id="dash" class="screen">
-    <h2>📊 Dashboard</h2>
-    <div id="report"></div>
-    <button onclick="menu()">رجوع</button>
+<div id="end" class="game">
+    <h2 id="endText"></h2>
+    <button onclick="backMap()">رجوع للخريطة</button>
 </div>
 
 <script>
+const areas = ["مفهوم الكسر","توحيد المقامات","الجمع","الطرح","مسائل تطبيقية"];
 
-/* ================= CORE ================= */
-
-let user="";
-let score=0;
+let selectedArea=0;
+let questions=[];
 let index=0;
-let island=0;
+let score=0;
 let stars=0;
+let timer;
+let timeLeft=15;
 
-/* ================= DATA ================= */
+/* خريطة */
+const map=document.getElementById("map");
+areas.forEach((a,i)=>{
+    let div=document.createElement("div");
+    div.className="island";
+    div.innerText=a;
+    div.onclick=()=>openLevels(i);
+    map.appendChild(div);
+});
 
-let data=JSON.parse(localStorage.getItem("gb_v12")||"{}");
-
-/* ================= QUESTIONS ================= */
-
-const islands=[
-[
-{q:"1/4 + 1/4 = ؟",c:["2/4","1/2","1/4"],a:1},
-{q:"2/5 + 1/5 = ؟",c:["3/5","2/10","1/5"],a:0},
-{q:"3/6 = ؟",c:["1/2","3/6","2/3"],a:0}
-]
-];
-
-/* ================= MAP ================= */
-
-let canvas=document.getElementById("map");
-let ctx=canvas.getContext("2d");
-
-let zones=[
-{x:100,y:80,w:120,h:60,name:"جزيرة الكسور"},
-{x:320,y:180,w:120,h:60,name:"قريبًا"}
-];
-
-let player={x:50,y:150};
-
-let keys={};
-
-document.addEventListener("keydown",e=>keys[e.key]=true);
-document.addEventListener("keyup",e=>keys[e.key]=false);
-
-/* ================= DRAW ================= */
-
-function draw(){
-    ctx.clearRect(0,0,500,300);
-
-    // islands
-    zones.forEach(z=>{
-        ctx.fillStyle="#1e293b";
-        ctx.fillRect(z.x,z.y,z.w,z.h);
-
-        ctx.fillStyle="#fff";
-        ctx.fillText(z.name,z.x+10,z.y+30);
-    });
-
-    // player
-    ctx.fillStyle="yellow";
-    ctx.beginPath();
-    ctx.arc(player.x,player.y,10,0,Math.PI*2);
-    ctx.fill();
-
-    moveCheck();
+function openLevels(i){
+    selectedArea=i;
+    document.getElementById("map").style.display="none";
+    document.getElementById("levels").style.display="block";
+    document.getElementById("areaName").innerText=areas[i];
 }
 
-/* ================= MOVEMENT ================= */
+/* توليد أسئلة */
+function generate(level){
+    let arr=[];
+    let max= level==="easy"?5: level==="medium"?8:12;
 
-function moveCheck(){
+    for(let i=0;i<15;i++){
+        let a=Math.floor(Math.random()*max)+1;
+        let b=Math.floor(Math.random()*max)+1;
 
-    if(keys["ArrowLeft"]) player.x-=3;
-    if(keys["ArrowRight"]) player.x+=3;
-    if(keys["ArrowUp"]) player.y-=3;
-    if(keys["ArrowDown"]) player.y+=3;
-
-    zones.forEach((z,i)=>{
-        if(player.x>z.x && player.x<z.x+z.w &&
-           player.y>z.y && player.y<z.y+z.h){
-            openIsland(i);
+        if(selectedArea===2){
+            arr.push({
+                q:`${a}/${b} + ${a}/${b} = ؟`,
+                choices:[`${2*a}/${b}`,`${a}/${b}`,`${a+b}/${b}`],
+                answer:0
+            });
         }
-    });
+        else if(selectedArea===3){
+            arr.push({
+                q:`${a*2}/${b} - ${a}/${b} = ؟`,
+                choices:[`${a}/${b}`,`${b}/${a}`,`${a*2}/${b}`],
+                answer:0
+            });
+        }
+        else{
+            arr.push({
+                q:`أي كسر أكبر؟`,
+                choices:[`${a}/${b}`,`${b}/${a}`,`1/${a}`],
+                answer:0
+            });
+        }
+    }
+    return arr;
 }
 
-/* ================= LOOP ================= */
-
-function loop(){
-    draw();
-    requestAnimationFrame(loop);
-}
-loop();
-
-/* ================= GAME ================= */
-
-function openIsland(i){
-    island=i;
+function startGame(level){
+    questions=generate(level);
     index=0;
     score=0;
-    showGame();
-}
+    stars=0;
 
-function showGame(){
-    show("game");
+    document.getElementById("levels").style.display="none";
+    document.getElementById("game").style.display="block";
+
     next();
 }
 
 function next(){
-    let q=islands[island][index];
-
-    document.getElementById("q").innerText=q.q;
+    let qObj=questions[index];
+    document.getElementById("q").innerText=qObj.q;
 
     let ch=document.getElementById("choices");
     ch.innerHTML="";
 
-    q.c.forEach((c,i)=>{
-        let b=document.createElement("div");
-        b.className="choice";
-        b.innerText=c;
-
-        b.onclick=()=>{
-            if(i===q.a){
-                b.classList.add("correct");
-                score+=10;
-            }else{
-                b.classList.add("wrong");
-            }
-
-            setTimeout(()=>{
-                index++;
-                if(index<islands[island].length){
-                    next();
-                }else finish();
-            },400);
-        };
-
-        ch.appendChild(b);
-    });
-}
-
-function finish(){
-
-    stars = score>=25?3:score>=15?2:1;
-
-    save();
-
-    document.getElementById("progress").innerHTML=
-    "⭐".repeat(stars) + " النتيجة: " + score;
-
-    menu();
-}
-
-/* ================= UI ================= */
-
-function show(id){
-    document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
-    document.getElementById(id).classList.add("active");
-}
-
-function start(){
-    user=document.getElementById("name").value;
-    if(!user) return alert("اكتب الاسم");
-
-    document.getElementById("welcome").innerText="أهلاً "+user;
-    show("menu");
-}
-
-/* ================= SAVE ================= */
-
-function save(){
-    if(!data[user]) data[user]=[];
-
-    data[user].push({
-        score,
-        stars,
-        date:new Date().toLocaleString()
+    qObj.choices.forEach((c,i)=>{
+        let btn=document.createElement("div");
+        btn.innerText=c;
+        btn.className="choice";
+        btn.onclick=()=>answer(btn,i);
+        ch.appendChild(btn);
     });
 
-    localStorage.setItem("gb_v12",JSON.stringify(data));
+    timeLeft=15;
+    startTimer();
+    updateUI();
 }
 
-/* ================= DASHBOARD ================= */
+function answer(btn,i){
+    clearInterval(timer);
 
-function openDash(){
-    show("dash");
+    let correct=questions[index].answer;
 
-    let html="<table border='1' width='90%'><tr><th>الطالب</th><th>الدرجة</th><th>النجوم</th><th>التاريخ</th></tr>";
-
-    for(let u in data){
-        data[u].forEach(r=>{
-            html+=`
-            <tr>
-                <td>${u}</td>
-                <td>${r.score}</td>
-                <td>${"⭐".repeat(r.stars)}</td>
-                <td>${r.date}</td>
-            </tr>`;
-        });
+    if(i===correct){
+        btn.classList.add("correct");
+        score+=10;
+        stars++;
+        beep(700);
+    }else{
+        btn.classList.add("wrong");
+        beep(200);
     }
 
-    html+="</table>";
-
-    document.getElementById("report").innerHTML=html;
+    setTimeout(()=>{
+        index++;
+        if(index<questions.length){
+            next();
+        }else{
+            endGame();
+        }
+    },800);
 }
 
-/* ================= INIT ================= */
+function startTimer(){
+    document.getElementById("time").innerText=timeLeft;
+    timer=setInterval(()=>{
+        timeLeft--;
+        document.getElementById("time").innerText=timeLeft;
 
-loop();
+        if(timeLeft<=0){
+            clearInterval(timer);
+            index++;
+            if(index<questions.length){
+                next();
+            }else{
+                endGame();
+            }
+        }
+    },1000);
+}
 
+function updateUI(){
+    document.getElementById("score").innerText="النقاط: "+score;
+    document.getElementById("stars").innerText="⭐".repeat(stars);
+    document.getElementById("bar").style.width=(index/15*100)+"%";
+}
+
+function beep(freq){
+    let ctx=new AudioContext();
+    let osc=ctx.createOscillator();
+    osc.frequency.value=freq;
+    osc.connect(ctx.destination);
+    osc.start();
+    setTimeout(()=>osc.stop(),150);
+}
+
+function endGame(){
+    document.getElementById("game").style.display="none";
+    document.getElementById("end").style.display="block";
+
+    let starsCount = stars>=12? "⭐⭐⭐": stars>=8? "⭐⭐": "⭐";
+
+    document.getElementById("endText").innerText=
+    `🎉 انتهيت!
+النقاط: ${score}
+تقييمك: ${starsCount}`;
+
+    localStorage.setItem("best_"+selectedArea, score);
+}
+
+function backMap(){
+    document.getElementById("end").style.display="none";
+    document.getElementById("game").style.display="none";
+    document.getElementById("levels").style.display="none";
+    document.getElementById("map").style.display="flex";
+}
 </script>
 
 </body>
